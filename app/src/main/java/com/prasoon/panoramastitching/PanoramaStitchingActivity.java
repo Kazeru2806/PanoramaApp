@@ -25,8 +25,7 @@ import android.widget.Toast;
 
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
-import org.opencv.highgui.Highgui;
-//import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgcodecs.Imgcodecs;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,8 +37,8 @@ import static android.hardware.Camera.open;
 public class PanoramaStitchingActivity extends AppCompatActivity {
 
     static {
+        System.loadLibrary("opencv_java4");
         System.loadLibrary("MyLibs");
-        System.loadLibrary("opencv_java");
     }
 
     private TextView mTextViewJni;
@@ -56,33 +55,46 @@ public class PanoramaStitchingActivity extends AppCompatActivity {
     SurfaceHolder.Callback mSurfaceCallBack = new SurfaceHolder.Callback() {
         @Override
         public void surfaceCreated(@NonNull SurfaceHolder holder) {
-            try {
-                mCam.setPreviewDisplay(holder);
-            } catch (IOException e) {
-
+            if (mCam != null) {
+                try {
+                    mCam.setPreviewDisplay(holder);
+                } catch (IOException e) {
+                    Log.e("Panorama", "Error setting camera preview display: " + e.getMessage());
+                }
+            } else {
+                Log.e("Panorama", "Camera is null in surfaceCreated");
             }
         }
 
         @Override
         public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-            // Get the default parameters for Camera
-            Camera.Parameters myParameters = mCam.getParameters();
-            // Select the best preview size
-            Camera.Size myBestSize = getBestPreviewSize(myParameters);
-            if (myBestSize != null) {
-                // Set the preview size
-                myParameters.setPreviewSize(myBestSize.width, myBestSize.height);
-
-                // Set the parameters to the camera
-                mCam.setParameters(myParameters);
-                // Rotate the display frame 90 degree to view in portrait mode
-                mCam.setDisplayOrientation(90);
-                // Start the preview
-                isPreview = true;
+            if (mCam == null) {
+                Log.e("Panorama", "Camera is null in surfaceChanged");
+                return;
             }
-            // Extra added to avoid camera error
-            mCam.startPreview();
-            safeToTakePicture = true;
+            try {
+                // Get the default parameters for Camera
+                Camera.Parameters myParameters = mCam.getParameters();
+                // Select the best preview size
+                Camera.Size myBestSize = getBestPreviewSize(myParameters);
+                if (myBestSize != null) {
+                    // Set the preview size
+                    myParameters.setPreviewSize(myBestSize.width, myBestSize.height);
+
+                    // Set the parameters to the camera
+                    mCam.setParameters(myParameters);
+                    // Rotate the display frame 90 degree to view in portrait mode
+                    mCam.setDisplayOrientation(90);
+                    // Start the preview
+                    isPreview = true;
+                }
+                // Extra added to avoid camera error
+                mCam.startPreview();
+                safeToTakePicture = true;
+            } catch (Exception e) {
+                Log.e("Panorama", "Error in surfaceChanged: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
 
         @Override
@@ -105,7 +117,39 @@ public class PanoramaStitchingActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        mCam = open(0); // 0 for back camera
+        // Camera is opened in onCreate, but if it was released, reopen it
+        if (mCam == null) {
+            try {
+                mCam = open(0); // 0 for back camera
+                if (mCam == null) {
+                    Log.e("Panorama", "Failed to open camera in onResume");
+                    Toast.makeText(this, "Failed to open camera. Please check permissions.", Toast.LENGTH_LONG).show();
+                } else {
+                    // Re-setup preview if surface is already created
+                    if (mSurfaceView.getHolder().getSurface().isValid()) {
+                        try {
+                            mCam.setPreviewDisplay(mSurfaceView.getHolder());
+                            Camera.Parameters myParameters = mCam.getParameters();
+                            Camera.Size myBestSize = getBestPreviewSize(myParameters);
+                            if (myBestSize != null) {
+                                myParameters.setPreviewSize(myBestSize.width, myBestSize.height);
+                                mCam.setParameters(myParameters);
+                                mCam.setDisplayOrientation(90);
+                                mCam.startPreview();
+                                isPreview = true;
+                                safeToTakePicture = true;
+                            }
+                        } catch (Exception e) {
+                            Log.e("Panorama", "Error setting up preview in onResume: " + e.getMessage());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e("Panorama", "Error opening camera in onResume: " + e.getMessage());
+                e.printStackTrace();
+                Toast.makeText(this, "Error opening camera: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     @Override
@@ -128,6 +172,22 @@ public class PanoramaStitchingActivity extends AppCompatActivity {
         // mTextViewJni.setText(NativePanorama.getMessageFromJni());
 
         isPreview = false;
+        
+        // Open camera first before setting up surface
+        try {
+            mCam = open(0); // 0 for back camera
+            if (mCam == null) {
+                Log.e("Panorama", "Failed to open camera in onCreate");
+                Toast.makeText(this, "Failed to open camera. Please check permissions.", Toast.LENGTH_LONG).show();
+                return;
+            }
+        } catch (Exception e) {
+            Log.e("Panorama", "Error opening camera in onCreate: " + e.getMessage());
+            e.printStackTrace();
+            Toast.makeText(this, "Error opening camera: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        
         mSurfaceView = findViewById(R.id.surfaceView);
         mSurfaceView.getHolder().addCallback(mSurfaceCallBack);
 
@@ -210,61 +270,100 @@ public class PanoramaStitchingActivity extends AppCompatActivity {
             @Override
             public void run() {
                 showProcessingDialog();
-                // TODO: implement OpenCV parts
+                String errorMessage = null;
+                String savedFileName = null;
                 try {
                     // Create a long array to store all image address
                     int elems = listImage.size();
-                    Log.i("Panorama","elems " +  elems);
+                    Log.i("Panorama","Number of images: " + elems);
 
-                    long[] tempobjadr = new long[elems];
-                    for (int i = 0; i < elems; i++) {
-                        tempobjadr[i] = listImage.get(i).getNativeObjAddr();
-                        Log.i("Panorama","tempobjadr["+i+"] " +  tempobjadr[i]);
-
-                    }
-
-                    // Create a Mat to store the final panorama image
-                    Mat result = new Mat();
-                    // Call the OpenCV C++ code to perform stitching process
-                    int ret = NativePanorama.processPanorama(tempobjadr, result.getNativeObjAddr());
-                    if(ret==0){
-                        Log.i("Panorama","ret " +  ret);
-                    }
-                    else{
-                        Log.i("Panorama","ret " +  ret);
-                    }
-                    // Save the image to external storage
-                    String directoryName = Environment.DIRECTORY_PICTURES;
-                    File sdcard = Environment.getExternalStoragePublicDirectory(directoryName);
-
-                    sdcard.mkdirs();
-                    final String fileName = sdcard + "/openCV_" + System.currentTimeMillis() + ".png";
-                    try {
-                        boolean bool = Highgui.imwrite(fileName, result);
-                        if (bool)
-                            Log.i("Panorama","SUCCESS writing image to external storage" +  fileName);
-                        else
-                            Log.i("Panorama", "Fail writing image to external storage" + fileName);
-
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (ret ==1 ){
-                                Toast.makeText(getApplicationContext(), "File saved at: " + fileName, Toast.LENGTH_LONG).show();
-                            }else
-                            Toast.makeText(getApplicationContext(), "File NOT saved. ", Toast.LENGTH_LONG).show();
-
+                    if (elems < 2) {
+                        errorMessage = "Need at least 2 images for panorama stitching. Current: " + elems;
+                        Log.e("Panorama", errorMessage);
+                    } else {
+                        long[] tempobjadr = new long[elems];
+                        for (int i = 0; i < elems; i++) {
+                            tempobjadr[i] = listImage.get(i).getNativeObjAddr();
+                            Log.i("Panorama","Image["+i+"] address: " + tempobjadr[i]);
                         }
-                    });
-                    listImage.clear();
-                }catch (Exception e){
+
+                        // Create a Mat to store the final panorama image
+                        Mat result = new Mat();
+                        // Call the OpenCV C++ code to perform stitching process
+                        int ret = NativePanorama.processPanorama(tempobjadr, result.getNativeObjAddr());
+                        Log.i("Panorama","Stitching return code: " + ret);
+                        
+                        // Check if result is valid and not empty
+                        boolean isValidResult = (ret == 1) && !result.empty() && result.rows() > 0 && result.cols() > 0;
+                        Log.i("Panorama","Result valid: " + isValidResult + ", rows: " + result.rows() + ", cols: " + result.cols());
+                        
+                        if (isValidResult) {
+                            // Use app-specific directory for better compatibility with modern Android
+                            File picturesDir;
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                // Android 10+ - use app-specific directory
+                                picturesDir = new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), "Panorama");
+                            } else {
+                                // Android 9 and below - use public Pictures directory
+                                picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+                                picturesDir = new File(picturesDir, "Panorama");
+                            }
+                            
+                            if (!picturesDir.exists()) {
+                                boolean created = picturesDir.mkdirs();
+                                Log.i("Panorama", "Created directory: " + created + " at " + picturesDir.getAbsolutePath());
+                            }
+                            
+                            savedFileName = new File(picturesDir, "panorama_" + System.currentTimeMillis() + ".png").getAbsolutePath();
+                            Log.i("Panorama", "Attempting to save to: " + savedFileName);
+                            
+                            boolean bool = Imgcodecs.imwrite(savedFileName, result);
+                            if (bool) {
+                                Log.i("Panorama", "SUCCESS writing image to: " + savedFileName);
+                                // Verify file exists
+                                File savedFile = new File(savedFileName);
+                                if (savedFile.exists()) {
+                                    Log.i("Panorama", "File verified exists, size: " + savedFile.length() + " bytes");
+                                } else {
+                                    Log.e("Panorama", "File does not exist after imwrite returned true!");
+                                    errorMessage = "File save reported success but file not found";
+                                    savedFileName = null;
+                                }
+                            } else {
+                                Log.e("Panorama", "FAILED writing image to: " + savedFileName);
+                                errorMessage = "Failed to write image file";
+                                savedFileName = null;
+                            }
+                        } else {
+                            if (ret == 0) {
+                                errorMessage = "Panorama stitching failed. Try taking more overlapping images.";
+                            } else {
+                                errorMessage = "Invalid result from stitching (empty or invalid dimensions)";
+                            }
+                            Log.e("Panorama", errorMessage);
+                        }
+                    }
+                } catch (Exception e) {
+                    errorMessage = "Error: " + e.getMessage();
+                    Log.e("Panorama", "Exception in image processing", e);
                     e.printStackTrace();
                 }
+
+                final String finalMessage = errorMessage != null ? errorMessage : 
+                    (savedFileName != null ? "Panorama saved at: " + savedFileName : "Unknown error occurred");
+                final String finalFileName = savedFileName;
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (finalFileName != null) {
+                            Toast.makeText(getApplicationContext(), "Panorama saved successfully!\n" + finalFileName, Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(getApplicationContext(), finalMessage, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+                listImage.clear();
                 closeProcessingDialog();
             }
 

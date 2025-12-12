@@ -1,12 +1,19 @@
-apply plugin: 'com.android.library'
+plugins {
+    id 'com.android.library'
+}
 
 android {
-    compileSdkVersion 30
-    buildToolsVersion "29.0.2"
+    namespace = 'org.opencv'
+    compileSdk = 34
 
     defaultConfig {
-        minSdkVersion 22
-        targetSdkVersion 28
+        minSdk = 22
+        targetSdk = 34
+    }
+
+    buildFeatures {
+        aidl = true
+        buildConfig = true
     }
 
     buildTypes {
@@ -14,5 +21,10 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
         }
+    }
+    
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 }

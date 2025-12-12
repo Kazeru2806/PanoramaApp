@@ -21,18 +21,36 @@ public class StartingActivity extends AppCompatActivity {
     }
 
     private void verifyPermissions(){
-        String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA};
+        String[] permissions = {Manifest.permission.CAMERA};
+        
+        // For Android 13+ (API 33+), use READ_MEDIA_IMAGES instead of READ_EXTERNAL_STORAGE
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissions = new String[]{
+                Manifest.permission.CAMERA,
+                Manifest.permission.READ_MEDIA_IMAGES
+            };
+        } else {
+            permissions = new String[]{
+                Manifest.permission.CAMERA,
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            };
+        }
 
-        if (ContextCompat.checkSelfPermission(this.getApplicationContext(), permissions[0])
-                == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(this.getApplicationContext(), permissions[1])
-                        == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(this.getApplicationContext(),permissions[2])
-                        == PackageManager.PERMISSION_GRANTED){
+        boolean allGranted = true;
+        for (String permission : permissions) {
+            if (ContextCompat.checkSelfPermission(this.getApplicationContext(), permission)
+                    != PackageManager.PERMISSION_GRANTED) {
+                allGranted = false;
+                break;
+            }
+        }
+
+        if (allGranted) {
             Intent intent = new Intent(this, PanoramaStitchingActivity.class);
-                    startActivity(intent);
-        }else {
+            startActivity(intent);
+            finish(); // Close this activity after launching the main one
+        } else {
             ActivityCompat.requestPermissions(StartingActivity.this, permissions, REQUEST_CODE);
         }
     }

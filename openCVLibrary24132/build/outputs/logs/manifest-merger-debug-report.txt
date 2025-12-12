@@ -1,0 +1,20 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml:2:1-5:12
+INJECTED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml:2:1-5:12
+	package
+		INJECTED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml
+	android:versionName
+		ADDED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml:4:7-37
+	xmlns:android
+		ADDED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml:2:11-69
+	android:versionCode
+		ADDED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml:3:7-34
+uses-sdk
+INJECTED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml
+INJECTED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /Users/kazeru2806/Documents/GitHub/PanoramaApp/openCVLibrary24132/src/main/AndroidManifest.xml
